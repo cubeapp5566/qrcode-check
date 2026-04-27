@@ -1,0 +1,13 @@
+services:
+  qrcode-check:
+    build: .
+    image: qrcode-check:latest
+    container_name: qrcode-check
+    restart: unless-stopped
+    ports:
+      - "4173:4173"
+    environment:
+      NODE_ENV: production
+      PORT: 4173
+    volumes:
+      - ./data:/app/data
