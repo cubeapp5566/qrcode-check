@@ -3,6 +3,20 @@ const fs = require("node:fs");
 const path = require("node:path");
 const express = require("express");
 
+const ASSET_CIPHER_KEY = Buffer.from("QRCodeCheck!Fixed@Key#2024$Data!", "utf8"); // 32 bytes
+
+function decryptAssets(b64) {
+  const combined = Buffer.from(b64, "base64");
+  const iv = combined.subarray(0, 12);
+  const payload = combined.subarray(12);
+  const authTag = payload.subarray(payload.length - 16);
+  const ciphertext = payload.subarray(0, payload.length - 16);
+  const decipher = crypto.createDecipheriv("aes-256-gcm", ASSET_CIPHER_KEY, iv);
+  decipher.setAuthTag(authTag);
+  const decrypted = Buffer.concat([decipher.update(ciphertext), decipher.final()]);
+  return JSON.parse(decrypted.toString("utf8"));
+}
+
 const app = express();
 const PORT = process.env.PORT || 4173;
 const DATA_DIR = path.join(__dirname, "..", "data");
@@ -76,7 +90,15 @@ app.get("/api/tasks", (_req, res) => {
 });
 
 app.post("/api/tasks", (req, res) => {
-  const { name, resourceColumn, locationColumn, assets } = req.body;
+  const { name, resourceColumn, locationColumn, encryptedAssets } = req.body;
+
+  let assets;
+  try {
+    assets = decryptAssets(encryptedAssets);
+  } catch {
+    return res.status(400).json({ error: "資產資料解密失敗，請重新上傳" });
+  }
+
   const cleanAssets = Array.isArray(assets)
     ? assets
         .map((asset) => ({
