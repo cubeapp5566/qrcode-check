@@ -426,6 +426,44 @@ textarea {
   font-weight: 800;
 }
 
+.scanner-identity-panel {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  margin-bottom: 16px;
+  background: #ffffff;
+  border: 1px solid #dce2ea;
+  border-radius: 8px;
+}
+
+.scanner-identity-panel h2 {
+  margin: 0;
+  font-size: 20px;
+  letter-spacing: 0;
+}
+
+.scanner-note-input {
+  min-height: 84px;
+}
+
+.scanner-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 12px;
+  padding: 10px 12px;
+  background: #ffffff;
+  border: 1px solid #dce2ea;
+  border-radius: 8px;
+}
+
+.scanner-meta span {
+  color: #263548;
+  font-size: 14px;
+  font-weight: 800;
+}
+
 .scanner-panel {
   padding: 14px;
 }
@@ -606,7 +644,8 @@ textarea {
   }
 
   .workspace-header,
-  .scan-header {
+  .scan-header,
+  .scanner-meta {
     display: grid;
   }
 

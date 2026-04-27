@@ -45,6 +45,15 @@ function saveScanPhoto(taskId, assetNo, photoDataUrl) {
   return `/scan-photos/${filename}`;
 }
 
+function parseScanner(scanner) {
+  const name = String(scanner?.name || "").trim();
+  const employeeId = String(scanner?.employeeId || "").trim();
+  const note = String(scanner?.note || "").trim();
+  if (!name) return { error: "請輸入掃描者姓名" };
+  if (!/^\d{8}$/.test(employeeId)) return { error: "員工編號需為 8 碼數字" };
+  return { name, employeeId, note };
+}
+
 function toSummary(task) {
   const checked = task.assets.filter((asset) => asset.checkedAt).length;
   return {
@@ -72,7 +81,8 @@ app.post("/api/tasks", (req, res) => {
           assetNo: String(asset.assetNo || "").trim(),
           raw: asset.raw && typeof asset.raw === "object" ? asset.raw : {},
           checkedAt: null,
-          scanPhotoUrl: null
+          scanPhotoUrl: null,
+          scannedBy: null
         }))
         .filter((asset) => asset.assetNo)
     : [];
@@ -126,11 +136,15 @@ app.post("/api/tasks/:id/scan", (req, res) => {
   const asset = task.assets.find((item) => item.assetNo === assetNo);
   if (!asset) return res.status(404).json({ error: "此任務沒有這個資產編號" });
 
+  const scanner = parseScanner(req.body.scanner);
+  if (scanner.error) return res.status(400).json({ error: scanner.error });
+
   const now = new Date().toISOString();
   const alreadyChecked = Boolean(asset.checkedAt);
   const scanPhotoUrl = saveScanPhoto(task.id, asset.assetNo, req.body.photoDataUrl);
   asset.checkedAt = asset.checkedAt || now;
   if (scanPhotoUrl) asset.scanPhotoUrl = scanPhotoUrl;
+  asset.scannedBy = scanner;
   task.updatedAt = now;
   writeStore(store);
   res.json({ asset, summary: toSummary(task), alreadyChecked });
@@ -147,7 +161,16 @@ app.get("/api/tasks/:id/export", (req, res) => {
       return columns;
     }, new Set())
   );
-  const columns = ["assetNo", "status", "checkedAt", "scanPhotoUrl", ...rawColumns.filter((column) => column !== "assetNo")];
+  const columns = [
+    "assetNo",
+    "status",
+    "checkedAt",
+    "scannerName",
+    "scannerEmployeeId",
+    "scannerNote",
+    "scanPhotoUrl",
+    ...rawColumns.filter((column) => column !== "assetNo")
+  ];
   const escapeCsv = (value) => {
     const text = value == null ? "" : String(value);
     return /[",\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
@@ -160,6 +183,9 @@ app.get("/api/tasks/:id/export", (req, res) => {
           if (column === "assetNo") return escapeCsv(asset.assetNo);
           if (column === "status") return escapeCsv(asset.checkedAt ? "checked" : "missing");
           if (column === "checkedAt") return escapeCsv(asset.checkedAt);
+          if (column === "scannerName") return escapeCsv(asset.scannedBy?.name);
+          if (column === "scannerEmployeeId") return escapeCsv(asset.scannedBy?.employeeId);
+          if (column === "scannerNote") return escapeCsv(asset.scannedBy?.note);
           if (column === "scanPhotoUrl") return escapeCsv(asset.scanPhotoUrl);
           return escapeCsv(asset.raw?.[column]);
         })

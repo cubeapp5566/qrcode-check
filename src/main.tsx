@@ -22,6 +22,7 @@ type Asset = {
   raw: Record<string, string>;
   checkedAt: string | null;
   scanPhotoUrl?: string | null;
+  scannedBy?: ScannerInfo | null;
 };
 
 type TaskDetail = {
@@ -45,6 +46,14 @@ type PendingScan = {
   photoDataUrl: string | null;
 };
 
+type ScannerInfo = {
+  name: string;
+  employeeId: string;
+  note?: string;
+};
+
+const SCANNER_STORAGE_KEY = "qrcode-check-scanner";
+
 const api = {
   async listTasks(): Promise<TaskSummary[]> {
     const response = await fetch("/api/tasks");
@@ -64,11 +73,11 @@ const api = {
     if (!response.ok) throw new Error((await response.json()).error || "建立任務失敗");
     return response.json() as Promise<TaskSummary>;
   },
-  async scan(taskId: string, assetNo: string, photoDataUrl?: string | null) {
+  async scan(taskId: string, assetNo: string, photoDataUrl: string | null | undefined, scanner: ScannerInfo) {
     const response = await fetch(`/api/tasks/${taskId}/scan`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ assetNo, photoDataUrl })
+      body: JSON.stringify({ assetNo, photoDataUrl, scanner })
     });
     const payload = await response.json();
     if (!response.ok) throw new Error(payload.error || "盤點失敗");
@@ -426,7 +435,7 @@ function TaskWorkspace({ task, onRefresh }: { task: TaskDetail; onRefresh: () =>
                   <CheckCircle2 size={18} />
                   <div>
                     <strong>{asset.assetNo}</strong>
-                    <span>{formatDate(asset.checkedAt)}</span>
+                    <span>{asset.scannedBy ? `${asset.scannedBy.name} · ${formatDate(asset.checkedAt)}` : formatDate(asset.checkedAt)}</span>
                   </div>
                 </div>
               ))}
@@ -468,9 +477,48 @@ function ScannerPage({
   const [lastAssetNo, setLastAssetNo] = useState("");
   const [manualAssetNo, setManualAssetNo] = useState(new URLSearchParams(location.search).get("asset") || "");
   const [pendingScan, setPendingScan] = useState<PendingScan | null>(null);
+  const [scannerInfo, setScannerInfo] = useState<ScannerInfo | null>(() => {
+    try {
+      const saved = window.localStorage.getItem(SCANNER_STORAGE_KEY);
+      if (!saved) return null;
+      const parsed = JSON.parse(saved) as ScannerInfo;
+      if (!parsed.name?.trim() || !/^\d{8}$/.test(parsed.employeeId || "")) return null;
+      return { name: parsed.name.trim(), employeeId: parsed.employeeId, note: String(parsed.note || "").trim() };
+    } catch {
+      return null;
+    }
+  });
+  const [scannerDraft, setScannerDraft] = useState<ScannerInfo>(() => scannerInfo || { name: "", employeeId: "", note: "" });
+  const [scannerError, setScannerError] = useState("");
   const readerId = "qr-reader";
 
   const checkedLookup = useMemo(() => new Set(task?.assets.filter((asset) => asset.checkedAt).map((asset) => asset.assetNo)), [task]);
+
+  function saveScannerInfo() {
+    const name = scannerDraft.name.trim();
+    const employeeId = scannerDraft.employeeId.trim();
+    const note = String(scannerDraft.note || "").trim();
+    if (!name) {
+      setScannerError("請輸入掃描者姓名");
+      return;
+    }
+    if (!/^\d{8}$/.test(employeeId)) {
+      setScannerError("員工編號需為 8 碼數字");
+      return;
+    }
+
+    const nextScanner = { name, employeeId, note };
+    window.localStorage.setItem(SCANNER_STORAGE_KEY, JSON.stringify(nextScanner));
+    setScannerInfo(nextScanner);
+    setScannerDraft(nextScanner);
+    setScannerError("");
+  }
+
+  function editScannerInfo() {
+    setScannerDraft(scannerInfo || { name: "", employeeId: "", note: "" });
+    setScannerInfo(null);
+    setScannerError("");
+  }
 
   function captureScannerPhoto() {
     const video = document.querySelector<HTMLVideoElement>(`#${readerId} video`);
@@ -489,10 +537,15 @@ function ScannerPage({
 
   const confirmScan = useCallback(async () => {
     if (!taskId || !pendingScan) return;
+    if (!scannerInfo) {
+      setStatus("error");
+      setMessage("請先填寫掃描者資料");
+      return;
+    }
     const assetNo = pendingScan.assetNo;
     setScanState("processing");
     try {
-      const result = await api.scan(taskId, assetNo, pendingScan.photoDataUrl);
+      const result = await api.scan(taskId, assetNo, pendingScan.photoDataUrl, scannerInfo);
       setLastAssetNo(assetNo);
       setStatus("ok");
       setMessage(`${assetNo} 已完成盤點${result.alreadyChecked ? "，先前已掃描過" : ""}`);
@@ -509,7 +562,7 @@ function ScannerPage({
       setMessage(err instanceof Error ? err.message : "盤點失敗");
       setScanState("confirming");
     }
-  }, [onLoadTask, pendingScan, taskId]);
+  }, [onLoadTask, pendingScan, scannerInfo, taskId]);
 
   function cancelPendingScan() {
     setPendingScan(null);
@@ -560,12 +613,13 @@ function ScannerPage({
 
   useEffect(() => {
     const assetFromUrl = new URLSearchParams(location.search).get("asset");
-    if (!taskId || !assetFromUrl || initialAssetHandledRef.current) return;
+    if (!scannerInfo || !taskId || !assetFromUrl || initialAssetHandledRef.current) return;
     initialAssetHandledRef.current = true;
     handleDetected(assetFromUrl);
-  }, [taskId, prepareScanConfirmation]);
+  }, [scannerInfo, taskId, prepareScanConfirmation]);
 
   useEffect(() => {
+    if (!scannerInfo) return;
     let disposed = false;
     const scanner = new Html5Qrcode(readerId);
     scannerRef.current = scanner;
@@ -610,7 +664,7 @@ function ScannerPage({
         .catch(() => undefined)
         .finally(() => scanner.clear());
     };
-  }, [taskId, prepareScanConfirmation]);
+  }, [scannerInfo, taskId, prepareScanConfirmation]);
 
   return (
     <main className="scan-shell">
@@ -622,50 +676,100 @@ function ScannerPage({
         </div>
       </header>
 
-      <section className="scanner-panel">
-        <div className="scanner-frame">
-          <div id={readerId} />
-          <div className={`scan-badge ${scanState}`}>
-            {scanState === "processing" ? "儲存盤點中" : scanState === "confirming" ? "請確認此資產" : "自動偵測 QR Code"}
-          </div>
-        </div>
-        {pendingScan && (
-          <div className="confirm-scan-card">
-            <div>
-              <span>待確認資產</span>
-              <strong>{pendingScan.assetNo}</strong>
-            </div>
-            {pendingScan.photoDataUrl ? (
-              <img src={pendingScan.photoDataUrl} alt="掃描當下照片" />
-            ) : (
-              <p className="empty">目前沒有可儲存的相機畫面。</p>
-            )}
-            <div className="confirm-actions">
-              <button className="secondary-button" type="button" onClick={cancelPendingScan}>
-                取消
-              </button>
-              <button className="primary-button" type="button" onClick={confirmScan} disabled={scanState === "processing"}>
-                <CheckCircle2 size={16} />
-                確認盤點
-              </button>
-            </div>
-          </div>
-        )}
-        {message && <div className={`notice ${status === "error" ? "error" : "success"}`}>{message}</div>}
-        {lastAssetNo && !pendingScan && (
-          <div className={`detected-card ${status === "error" ? "error" : "success"}`}>
-            <span>最近偵測</span>
-            <strong>{lastAssetNo}</strong>
-          </div>
-        )}
-        <div className="manual-scan">
-          <input value={manualAssetNo} onChange={(event) => setManualAssetNo(event.target.value)} placeholder="手動輸入資產編號" />
-          <button className="primary-button" onClick={() => handleDetected(manualAssetNo)}>
+      {!scannerInfo && (
+        <section className="scanner-identity-panel">
+          <h2>掃描者資料</h2>
+          <label>
+            <span>姓名</span>
+            <input value={scannerDraft.name} onChange={(event) => setScannerDraft((current) => ({ ...current, name: event.target.value }))} />
+          </label>
+          <label>
+            <span>員工編號</span>
+            <input
+              value={scannerDraft.employeeId}
+              inputMode="numeric"
+              maxLength={8}
+              onChange={(event) =>
+                setScannerDraft((current) => ({ ...current, employeeId: event.target.value.replace(/\D/g, "").slice(0, 8) }))
+              }
+              placeholder="8 碼數字"
+            />
+          </label>
+          <label>
+            <span>備註</span>
+            <textarea
+              className="scanner-note-input"
+              value={scannerDraft.note || ""}
+              onChange={(event) => setScannerDraft((current) => ({ ...current, note: event.target.value }))}
+              placeholder="選填"
+            />
+          </label>
+          {scannerError && <div className="notice error compact">{scannerError}</div>}
+          <button className="primary-button" type="button" onClick={saveScannerInfo}>
             <CheckCircle2 size={16} />
-            建立確認
+            開始掃描
+          </button>
+        </section>
+      )}
+
+      {scannerInfo && (
+        <div className="scanner-meta">
+          <span>
+            掃描者：{scannerInfo.name} · {scannerInfo.employeeId}
+            {scannerInfo.note ? ` · ${scannerInfo.note}` : ""}
+          </span>
+          <button className="secondary-button" type="button" onClick={editScannerInfo}>
+            更換掃描者
           </button>
         </div>
-      </section>
+      )}
+
+      {scannerInfo && (
+        <section className="scanner-panel">
+          <div className="scanner-frame">
+            <div id={readerId} />
+            <div className={`scan-badge ${scanState}`}>
+              {scanState === "processing" ? "儲存盤點中" : scanState === "confirming" ? "請確認此資產" : "自動偵測 QR Code"}
+            </div>
+          </div>
+          {pendingScan && (
+            <div className="confirm-scan-card">
+              <div>
+                <span>待確認資產</span>
+                <strong>{pendingScan.assetNo}</strong>
+              </div>
+              {pendingScan.photoDataUrl ? (
+                <img src={pendingScan.photoDataUrl} alt="掃描當下照片" />
+              ) : (
+                <p className="empty">目前沒有可儲存的相機畫面。</p>
+              )}
+              <div className="confirm-actions">
+                <button className="secondary-button" type="button" onClick={cancelPendingScan}>
+                  取消
+                </button>
+                <button className="primary-button" type="button" onClick={confirmScan} disabled={scanState === "processing"}>
+                  <CheckCircle2 size={16} />
+                  確認盤點
+                </button>
+              </div>
+            </div>
+          )}
+          {message && <div className={`notice ${status === "error" ? "error" : "success"}`}>{message}</div>}
+          {lastAssetNo && !pendingScan && (
+            <div className={`detected-card ${status === "error" ? "error" : "success"}`}>
+              <span>最近偵測</span>
+              <strong>{lastAssetNo}</strong>
+            </div>
+          )}
+          <div className="manual-scan">
+            <input value={manualAssetNo} onChange={(event) => setManualAssetNo(event.target.value)} placeholder="手動輸入資產編號" />
+            <button className="primary-button" onClick={() => handleDetected(manualAssetNo)}>
+              <CheckCircle2 size={16} />
+              建立確認
+            </button>
+          </div>
+        </section>
+      )}
 
       {task && (
         <section className="scan-list">
