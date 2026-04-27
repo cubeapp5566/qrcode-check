@@ -441,16 +441,24 @@ function ScannerPage({
     let disposed = false;
     const scanner = new Html5Qrcode(readerId);
     scannerRef.current = scanner;
+
+    const scanConfig = {
+      fps: 10,
+      qrbox: (viewfinderWidth: number, viewfinderHeight: number) => {
+        const size = Math.floor(Math.min(viewfinderWidth, viewfinderHeight, 280) * 0.82);
+        return { width: size, height: size };
+      },
+      aspectRatio: 1.333
+    };
+    const onSuccess = (decodedText: string) => {
+      if (disposed) return;
+      handleDetected(decodedText);
+    };
+
     scanner
-      .start(
-        { facingMode: "environment" },
-        { fps: 10, qrbox: { width: 260, height: 260 } },
-        (decodedText) => {
-          if (disposed) return;
-          handleDetected(decodedText);
-        },
-        () => undefined
-      )
+      .start({ facingMode: { exact: "environment" } }, scanConfig, onSuccess, () => undefined)
+      .catch(() => scanner.start({ facingMode: "environment" }, scanConfig, onSuccess, () => undefined))
+      .catch(() => scanner.start({ facingMode: "user" }, scanConfig, onSuccess, () => undefined))
       .catch(() => {
         setStatus("error");
         setMessage("無法開啟相機，請確認瀏覽器權限，或使用手動輸入。");

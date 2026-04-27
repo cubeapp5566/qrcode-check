@@ -377,8 +377,22 @@ select {
 }
 
 #qr-reader {
+  width: 100%;
+  min-height: min(62vh, 520px);
+  background: #101820;
   overflow: hidden;
   border-radius: 8px;
+}
+
+#qr-reader video {
+  width: 100% !important;
+  height: min(62vh, 520px) !important;
+  object-fit: cover;
+}
+
+#qr-reader__scan_region,
+#qr-reader__scan_region img {
+  width: 100% !important;
 }
 
 .scanner-frame {
@@ -487,6 +501,14 @@ select {
   .workspace,
   .scan-shell {
     padding: 14px;
+  }
+
+  #qr-reader {
+    min-height: min(56vh, 420px);
+  }
+
+  #qr-reader video {
+    height: min(56vh, 420px) !important;
   }
 
   .workspace-header,
