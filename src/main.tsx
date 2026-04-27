@@ -23,6 +23,7 @@ type TaskSummary = {
   id: string;
   name: string;
   resourceColumn: string;
+  locationColumn: string;
   total: number;
   checked: number;
   missing: number;
@@ -42,6 +43,7 @@ type TaskDetail = {
   id: string;
   name: string;
   resourceColumn: string;
+  locationColumn: string;
   assets: Asset[];
   createdAt: string;
   updatedAt: string;
@@ -77,7 +79,12 @@ const api = {
     if (!response.ok) throw new Error((await response.json()).error || "讀取任務失敗");
     return response.json();
   },
-  async createTask(payload: { name: string; resourceColumn: string; assets: { assetNo: string; raw: Record<string, string> }[] }) {
+  async createTask(payload: {
+    name: string;
+    resourceColumn: string;
+    locationColumn: string;
+    assets: { assetNo: string; raw: Record<string, string> }[];
+  }) {
     const response = await fetch("/api/tasks", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -121,6 +128,16 @@ function formatDate(value: string | null) {
     dateStyle: "short",
     timeStyle: "medium"
   }).format(new Date(value));
+}
+
+function guessLocationColumn(fields: string[]) {
+  return fields.find((field) => ["存放位置", "地點", "位置", "location", "Location"].includes(field)) || "";
+}
+
+function getAssetLocation(task: TaskDetail, asset: Asset) {
+  const fallbackColumn = guessLocationColumn(Object.keys(asset.raw || {}));
+  const column = task.locationColumn || fallbackColumn;
+  return column ? asset.raw?.[column] || "" : "";
 }
 
 function App() {
@@ -215,6 +232,7 @@ function TaskImporter({ onCreated }: { onCreated: (task: TaskSummary) => void })
   const [csvText, setCsvText] = useState("");
   const [pasteModalOpen, setPasteModalOpen] = useState(false);
   const [resourceColumn, setResourceColumn] = useState("");
+  const [locationColumn, setLocationColumn] = useState("");
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
@@ -237,6 +255,7 @@ function TaskImporter({ onCreated }: { onCreated: (task: TaskSummary) => void })
 
     setCsv({ fields, rows });
     setResourceColumn(fields[0] || "");
+    setLocationColumn(guessLocationColumn(fields));
     if (!name) setName(fallbackName);
     return true;
   }
@@ -287,12 +306,14 @@ function TaskImporter({ onCreated }: { onCreated: (task: TaskSummary) => void })
       const created = await api.createTask({
         name,
         resourceColumn,
+        locationColumn,
         assets: csv.rows.map((row) => ({ assetNo: row[resourceColumn], raw: row }))
       });
       setName("");
       setCsv(null);
       setCsvText("");
       setResourceColumn("");
+      setLocationColumn("");
       onCreated(created);
     } catch (err) {
       setError(err instanceof Error ? err.message : "上傳失敗");
@@ -348,16 +369,29 @@ function TaskImporter({ onCreated }: { onCreated: (task: TaskSummary) => void })
         </div>
       )}
       {csv && (
-        <label>
-          <span>資源編號欄位</span>
-          <select value={resourceColumn} onChange={(event) => setResourceColumn(event.target.value)}>
-            {csv.fields.map((field) => (
-              <option key={field} value={field}>
-                {field}
-              </option>
-            ))}
-          </select>
-        </label>
+        <>
+          <label>
+            <span>資源編號欄位</span>
+            <select value={resourceColumn} onChange={(event) => setResourceColumn(event.target.value)}>
+              {csv.fields.map((field) => (
+                <option key={field} value={field}>
+                  {field}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            <span>地點欄位</span>
+            <select value={locationColumn} onChange={(event) => setLocationColumn(event.target.value)}>
+              <option value="">不指定</option>
+              {csv.fields.map((field) => (
+                <option key={field} value={field}>
+                  {field}
+                </option>
+              ))}
+            </select>
+          </label>
+        </>
       )}
       {error && <div className="notice error compact">{error}</div>}
       <button className="primary-button" onClick={submit} disabled={submitting}>
@@ -393,7 +427,8 @@ function TaskWorkspace({ task, onRefresh }: { task: TaskDetail; onRefresh: () =>
         <div>
           <h2>{task.name}</h2>
           <p>
-            資源欄位：{task.resourceColumn} · 建立時間：{formatDate(task.createdAt)}
+            資源欄位：{task.resourceColumn}
+            {task.locationColumn ? ` · 地點欄位：${task.locationColumn}` : ""} · 建立時間：{formatDate(task.createdAt)}
           </p>
         </div>
         <div className="actions">
@@ -454,11 +489,16 @@ function TaskWorkspace({ task, onRefresh }: { task: TaskDetail; onRefresh: () =>
                     <strong>{asset.assetNo}</strong>
                     <span>{asset.raw["資產名稱"] || asset.raw.name || asset.raw.Name || "未命名資產"}</span>
                   </div>
+                  <div className="inventory-location">
+                    <span>地點</span>
+                    <strong>{getAssetLocation(task, asset) || "-"}</strong>
+                  </div>
                   <div className="inventory-status">
                     <span className={asset.checkedAt ? "status-pill checked" : "status-pill"}>{asset.checkedAt ? "已盤點" : "待盤點"}</span>
                     <small>{formatDate(asset.checkedAt)}</small>
                   </div>
                   <div className="inventory-scanner">
+                    <small>盤點人</small>
                     <span>{asset.scannedBy?.name || "-"}</span>
                     <small>{asset.scannedBy?.employeeId || ""}</small>
                     {asset.scannedBy?.note && <small>{asset.scannedBy.note}</small>}

@@ -378,7 +378,7 @@ textarea {
 
 .inventory-row {
   display: grid;
-  grid-template-columns: minmax(160px, 1.4fr) minmax(120px, 0.9fr) minmax(140px, 1fr) 72px;
+  grid-template-columns: minmax(150px, 1.3fr) minmax(120px, 1fr) minmax(110px, 0.8fr) minmax(130px, 1fr) 72px;
   gap: 12px;
   align-items: center;
   padding: 12px;
@@ -393,6 +393,7 @@ textarea {
 }
 
 .inventory-main,
+.inventory-location,
 .inventory-status,
 .inventory-scanner {
   display: grid;
@@ -402,16 +403,22 @@ textarea {
 
 .inventory-main strong,
 .inventory-main span,
+.inventory-location strong,
 .inventory-scanner span,
 .inventory-scanner small {
   overflow-wrap: anywhere;
 }
 
 .inventory-main span,
+.inventory-location span,
 .inventory-status small,
 .inventory-scanner small {
   color: #627084;
   font-size: 13px;
+}
+
+.inventory-location strong {
+  font-size: 14px;
 }
 
 .status-pill {
@@ -738,7 +745,7 @@ textarea {
   }
 
   .inventory-row {
-    grid-template-columns: 1fr 120px;
+    grid-template-columns: 1fr 1fr 96px;
   }
 }
 

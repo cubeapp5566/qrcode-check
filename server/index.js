@@ -60,6 +60,7 @@ function toSummary(task) {
     id: task.id,
     name: task.name,
     resourceColumn: task.resourceColumn,
+    locationColumn: task.locationColumn || "",
     total: task.assets.length,
     checked,
     missing: task.assets.length - checked,
@@ -74,7 +75,7 @@ app.get("/api/tasks", (_req, res) => {
 });
 
 app.post("/api/tasks", (req, res) => {
-  const { name, resourceColumn, assets } = req.body;
+  const { name, resourceColumn, locationColumn, assets } = req.body;
   const cleanAssets = Array.isArray(assets)
     ? assets
         .map((asset) => ({
@@ -109,6 +110,7 @@ app.post("/api/tasks", (req, res) => {
     id: crypto.randomUUID(),
     name: String(name).trim(),
     resourceColumn: String(resourceColumn).trim(),
+    locationColumn: String(locationColumn || "").trim(),
     assets: uniqueAssets,
     createdAt: now,
     updatedAt: now
@@ -165,6 +167,7 @@ app.get("/api/tasks/:id/export", (req, res) => {
     "assetNo",
     "status",
     "checkedAt",
+    "location",
     "scannerName",
     "scannerEmployeeId",
     "scannerNote",
@@ -183,6 +186,7 @@ app.get("/api/tasks/:id/export", (req, res) => {
           if (column === "assetNo") return escapeCsv(asset.assetNo);
           if (column === "status") return escapeCsv(asset.checkedAt ? "checked" : "missing");
           if (column === "checkedAt") return escapeCsv(asset.checkedAt);
+          if (column === "location") return escapeCsv(asset.raw?.[task.locationColumn]);
           if (column === "scannerName") return escapeCsv(asset.scannedBy?.name);
           if (column === "scannerEmployeeId") return escapeCsv(asset.scannedBy?.employeeId);
           if (column === "scannerNote") return escapeCsv(asset.scannedBy?.note);
