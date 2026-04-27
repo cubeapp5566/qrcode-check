@@ -456,17 +456,17 @@ textarea {
 
 .qr-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(148px, 1fr));
-  gap: 12px;
-  margin-top: 16px;
+  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+  gap: 8px;
+  margin-top: 12px;
 }
 
 .qr-tile {
   display: grid;
   justify-items: center;
-  gap: 6px;
-  min-height: 190px;
-  padding: 12px;
+  gap: 3px;
+  min-height: unset;
+  padding: 8px;
   border: 1px solid #dce2ea;
   border-radius: 8px;
   background: #ffffff;
@@ -479,8 +479,9 @@ textarea {
 }
 
 .qr-tile strong {
-  max-width: 100%;
+  width: 100%;
   overflow-wrap: anywhere;
+  font-size: 13px;
 }
 
 .inventory-list {
@@ -1105,7 +1106,6 @@ textarea {
 
   .qr-tile {
     break-inside: avoid;
-    min-height: unset;
   }
 
   .qr-tile.checked {
