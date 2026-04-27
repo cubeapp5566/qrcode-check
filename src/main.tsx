@@ -575,7 +575,6 @@ function TaskWorkspace({ task, onRefresh }: { task: TaskDetail; onRefresh: () =>
                 <article className={`qr-tile ${asset.checkedAt ? "checked" : ""}`} key={asset.assetNo}>
                   <QRCodeSVG value={getScanUrl(task.id, asset.assetNo)} size={112} includeMargin />
                   <strong>{asset.assetNo}</strong>
-                  <span>{asset.checkedAt ? "已盤點" : "待盤點"}</span>
                 </article>
               ))}
             </div>

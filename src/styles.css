@@ -1105,5 +1105,11 @@ textarea {
 
   .qr-tile {
     break-inside: avoid;
+    min-height: unset;
+  }
+
+  .qr-tile.checked {
+    background: #ffffff;
+    border-color: #dce2ea;
   }
 }
