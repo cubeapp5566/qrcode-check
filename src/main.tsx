@@ -3,7 +3,20 @@ import { createRoot } from "react-dom/client";
 import Papa from "papaparse";
 import { QRCodeSVG } from "qrcode.react";
 import { Html5Qrcode, type Html5QrcodeCameraScanConfig } from "html5-qrcode";
-import { Camera, CheckCircle2, ClipboardPaste, Download, FileUp, Printer, QrCode, RefreshCw, Upload, X } from "lucide-react";
+import {
+  Camera,
+  CheckCircle2,
+  ClipboardPaste,
+  Download,
+  FileUp,
+  ImageIcon,
+  ListChecks,
+  Printer,
+  QrCode,
+  RefreshCw,
+  Upload,
+  X
+} from "lucide-react";
 import "./styles.css";
 
 type TaskSummary = {
@@ -366,6 +379,7 @@ function EmptyState() {
 }
 
 function TaskWorkspace({ task, onRefresh }: { task: TaskDetail; onRefresh: () => void }) {
+  const [viewMode, setViewMode] = useState<"qr" | "list">("qr");
   const checkedRatio = task.summary.total ? Math.round((task.summary.checked / task.summary.total) * 100) : 0;
   const scanHref = `/scan?task=${task.id}`;
   const recentAssets = [...task.assets]
@@ -408,20 +422,62 @@ function TaskWorkspace({ task, onRefresh }: { task: TaskDetail; onRefresh: () =>
       <section className="content-grid">
         <div className="panel">
           <div className="section-title">
-            <span>QR 標籤 Grid</span>
+            <div className="view-tabs" role="tablist" aria-label="任務檢視">
+              <button className={viewMode === "qr" ? "active" : ""} type="button" onClick={() => setViewMode("qr")}>
+                <QrCode size={16} />
+                QR 標籤
+              </button>
+              <button className={viewMode === "list" ? "active" : ""} type="button" onClick={() => setViewMode("list")}>
+                <ListChecks size={16} />
+                盤點清單
+              </button>
+            </div>
             <button className="icon-button" onClick={onRefresh} title="重新整理">
               <RefreshCw size={16} />
             </button>
           </div>
-          <div className="qr-grid">
-            {task.assets.map((asset) => (
-              <article className={`qr-tile ${asset.checkedAt ? "checked" : ""}`} key={asset.assetNo}>
-                <QRCodeSVG value={getScanUrl(task.id, asset.assetNo)} size={112} includeMargin />
-                <strong>{asset.assetNo}</strong>
-                <span>{asset.checkedAt ? "已盤點" : "待盤點"}</span>
-              </article>
-            ))}
-          </div>
+          {viewMode === "qr" ? (
+            <div className="qr-grid">
+              {task.assets.map((asset) => (
+                <article className={`qr-tile ${asset.checkedAt ? "checked" : ""}`} key={asset.assetNo}>
+                  <QRCodeSVG value={getScanUrl(task.id, asset.assetNo)} size={112} includeMargin />
+                  <strong>{asset.assetNo}</strong>
+                  <span>{asset.checkedAt ? "已盤點" : "待盤點"}</span>
+                </article>
+              ))}
+            </div>
+          ) : (
+            <div className="inventory-list">
+              {task.assets.map((asset) => (
+                <article className={`inventory-row ${asset.checkedAt ? "checked" : ""}`} key={asset.assetNo}>
+                  <div className="inventory-main">
+                    <strong>{asset.assetNo}</strong>
+                    <span>{asset.raw["資產名稱"] || asset.raw.name || asset.raw.Name || "未命名資產"}</span>
+                  </div>
+                  <div className="inventory-status">
+                    <span className={asset.checkedAt ? "status-pill checked" : "status-pill"}>{asset.checkedAt ? "已盤點" : "待盤點"}</span>
+                    <small>{formatDate(asset.checkedAt)}</small>
+                  </div>
+                  <div className="inventory-scanner">
+                    <span>{asset.scannedBy?.name || "-"}</span>
+                    <small>{asset.scannedBy?.employeeId || ""}</small>
+                    {asset.scannedBy?.note && <small>{asset.scannedBy.note}</small>}
+                  </div>
+                  <div className="inventory-photo">
+                    {asset.scanPhotoUrl ? (
+                      <a href={asset.scanPhotoUrl} target="_blank" rel="noreferrer" title="開啟照片">
+                        <img src={asset.scanPhotoUrl} alt={`${asset.assetNo} 盤點照片`} />
+                      </a>
+                    ) : (
+                      <span>
+                        <ImageIcon size={18} />
+                      </span>
+                    )}
+                  </div>
+                </article>
+              ))}
+            </div>
+          )}
         </div>
 
         <div className="panel side-panel">
