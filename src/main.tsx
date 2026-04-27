@@ -74,9 +74,24 @@ type ScannerInfo = {
 
 const SCANNER_STORAGE_KEY = "qrcode-check-scanner";
 
+const ASSET_CIPHER_KEY = "QRCodeCheck!Fixed@Key#2024$Data!"; // 32 bytes, AES-256-GCM
+
+async function encryptAssets(assets: { assetNo: string; raw: Record<string, string> }[]): Promise<string> {
+  const keyBytes = new TextEncoder().encode(ASSET_CIPHER_KEY);
+  const key = await crypto.subtle.importKey("raw", keyBytes, { name: "AES-GCM" }, false, ["encrypt"]);
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const plaintext = new TextEncoder().encode(JSON.stringify(assets));
+  const ciphertext = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, key, plaintext);
+  const combined = new Uint8Array(12 + ciphertext.byteLength);
+  combined.set(iv, 0);
+  combined.set(new Uint8Array(ciphertext), 12);
+  return btoa(String.fromCharCode(...combined));
+}
+
 const api = {
   async listTasks(): Promise<TaskSummary[]> {
     const response = await fetch("/api/tasks");
+    if (!response.ok) throw new Error((await response.json()).error || "讀取任務列表失敗");
     return response.json();
   },
   async getTask(id: string): Promise<TaskDetail> {
@@ -90,10 +105,12 @@ const api = {
     locationColumn: string;
     assets: { assetNo: string; raw: Record<string, string> }[];
   }) {
+    const { assets, ...rest } = payload;
+    const encryptedAssets = await encryptAssets(assets);
     const response = await fetch("/api/tasks", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload)
+      body: JSON.stringify({ ...rest, encryptedAssets })
     });
     if (!response.ok) throw new Error((await response.json()).error || "建立任務失敗");
     return response.json() as Promise<TaskSummary>;
@@ -300,6 +317,7 @@ function TaskImporter({ onCreated }: { onCreated: (task: TaskSummary) => void })
   const [csv, setCsv] = useState<ParsedCsv | null>(null);
   const [csvText, setCsvText] = useState("");
   const [pasteModalOpen, setPasteModalOpen] = useState(false);
+  const pasteSeq = useRef(0);
   const [resourceColumn, setResourceColumn] = useState("");
   const [locationColumn, setLocationColumn] = useState("");
   const [error, setError] = useState("");
@@ -357,7 +375,12 @@ function TaskImporter({ onCreated }: { onCreated: (task: TaskSummary) => void })
       header: true,
       skipEmptyLines: true,
       complete(result) {
-        parsed = applyParsedCsv(result, "貼上 CSV");
+        const now = new Date();
+        const datePart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+        const timePart = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
+        pasteSeq.current += 1;
+        const defaultName = `${datePart} ${timePart} #${pasteSeq.current}`;
+        parsed = applyParsedCsv(result, defaultName);
       },
       error(err: Error) {
         setError(err.message);
