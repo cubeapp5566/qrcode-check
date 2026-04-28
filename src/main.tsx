@@ -29,6 +29,7 @@ type TaskSummary = {
   name: string;
   resourceColumn: string;
   assetNameColumn: string;
+  ownerColumn: string;
   locationColumn: string;
   total: number;
   checked: number;
@@ -50,6 +51,7 @@ type TaskDetail = {
   name: string;
   resourceColumn: string;
   assetNameColumn: string;
+  ownerColumn: string;
   locationColumn: string;
   assets: Asset[];
   createdAt: string;
@@ -108,6 +110,7 @@ const api = {
     name: string;
     resourceColumn: string;
     assetNameColumn: string;
+    ownerColumn: string;
     locationColumn: string;
     assets: { assetNo: string; raw: Record<string, string> }[];
   }) {
@@ -179,6 +182,16 @@ function guessAssetNameColumn(fields: string[]) {
 function getAssetName(task: Pick<TaskDetail, "assetNameColumn">, asset: Asset) {
   const fallbackColumn = guessAssetNameColumn(Object.keys(asset.raw || {}));
   const column = task.assetNameColumn || fallbackColumn;
+  return column ? asset.raw?.[column] || "" : "";
+}
+
+function guessOwnerColumn(fields: string[]) {
+  return fields.find((field) => ["資產所有者", "所有者", "保管人", "使用者", "owner", "Owner", "user", "User"].includes(field)) || "";
+}
+
+function getAssetOwner(task: Pick<TaskDetail, "ownerColumn">, asset: Asset) {
+  const fallbackColumn = guessOwnerColumn(Object.keys(asset.raw || {}));
+  const column = task.ownerColumn || fallbackColumn;
   return column ? asset.raw?.[column] || "" : "";
 }
 
@@ -336,6 +349,7 @@ function TaskImporter({ onCreated }: { onCreated: (task: TaskSummary) => void })
   const pasteSeq = useRef(0);
   const [resourceColumn, setResourceColumn] = useState("");
   const [assetNameColumn, setAssetNameColumn] = useState("");
+  const [ownerColumn, setOwnerColumn] = useState("");
   const [locationColumn, setLocationColumn] = useState("");
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -360,6 +374,7 @@ function TaskImporter({ onCreated }: { onCreated: (task: TaskSummary) => void })
     setCsv({ fields, rows });
     setResourceColumn(fields[0] || "");
     setAssetNameColumn(guessAssetNameColumn(fields));
+    setOwnerColumn(guessOwnerColumn(fields));
     setLocationColumn(guessLocationColumn(fields));
     if (!name) setName(fallbackName);
     return true;
@@ -417,6 +432,7 @@ function TaskImporter({ onCreated }: { onCreated: (task: TaskSummary) => void })
         name,
         resourceColumn,
         assetNameColumn,
+        ownerColumn,
         locationColumn,
         assets: csv.rows.map((row) => ({ assetNo: row[resourceColumn], raw: row }))
       });
@@ -425,6 +441,7 @@ function TaskImporter({ onCreated }: { onCreated: (task: TaskSummary) => void })
       setCsvText("");
       setResourceColumn("");
       setAssetNameColumn("");
+      setOwnerColumn("");
       setLocationColumn("");
       onCreated(created);
     } catch (err) {
@@ -504,6 +521,17 @@ function TaskImporter({ onCreated }: { onCreated: (task: TaskSummary) => void })
             </select>
           </label>
           <label>
+            <span>資產所有者欄位</span>
+            <select value={ownerColumn} onChange={(event) => setOwnerColumn(event.target.value)}>
+              <option value="">不指定</option>
+              {csv.fields.map((field) => (
+                <option key={field} value={field}>
+                  {field}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
             <span>地點欄位</span>
             <select value={locationColumn} onChange={(event) => setLocationColumn(event.target.value)}>
               <option value="">不指定</option>
@@ -558,6 +586,7 @@ function TaskWorkspace({ task, onRefresh }: { task: TaskDetail; onRefresh: () =>
       const searchableText = [
         asset.assetNo,
         getAssetName(task, asset),
+        getAssetOwner(task, asset),
         getAssetLocation(task, asset),
         asset.scannedBy?.name,
         asset.scannedBy?.employeeId,
@@ -584,6 +613,7 @@ function TaskWorkspace({ task, onRefresh }: { task: TaskDetail; onRefresh: () =>
           <p>
             資源欄位：{task.resourceColumn}
             {task.assetNameColumn ? ` · 資產名稱欄位：${task.assetNameColumn}` : ""}
+            {task.ownerColumn ? ` · 資產所有者欄位：${task.ownerColumn}` : ""}
             {task.locationColumn ? ` · 地點欄位：${task.locationColumn}` : ""} · 建立時間：{formatDate(task.createdAt)}
           </p>
         </div>
@@ -676,6 +706,10 @@ function TaskWorkspace({ task, onRefresh }: { task: TaskDetail; onRefresh: () =>
                     <div className="inventory-location">
                       <span>地點</span>
                       <strong>{getAssetLocation(task, asset) || "-"}</strong>
+                    </div>
+                    <div className="inventory-owner">
+                      <span>資產所有者</span>
+                      <strong>{getAssetOwner(task, asset) || "-"}</strong>
                     </div>
                     <div className="inventory-status">
                       <span className={asset.checkedAt ? "status-pill checked" : "status-pill"}>{asset.checkedAt ? "已盤點" : "待盤點"}</span>
