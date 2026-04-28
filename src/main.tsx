@@ -537,6 +537,7 @@ function TaskWorkspace({ task, onRefresh }: { task: TaskDetail; onRefresh: () =>
   const [copiedScanUrl, setCopiedScanUrl] = useState(false);
   const [inventoryStatusFilter, setInventoryStatusFilter] = useState<"all" | "checked" | "missing">("all");
   const [inventoryQuery, setInventoryQuery] = useState("");
+  const [photoPreview, setPhotoPreview] = useState<{ assetNo: string; url: string } | null>(null);
   const checkedRatio = task.summary.total ? Math.round((task.summary.checked / task.summary.total) * 100) : 0;
   const scanHref = `/scan?task=${task.id}`;
   const scanUrl = new URL(scanHref, window.location.origin).toString();
@@ -688,9 +689,14 @@ function TaskWorkspace({ task, onRefresh }: { task: TaskDetail; onRefresh: () =>
                     </div>
                     <div className="inventory-photo">
                       {asset.scanPhotoUrl ? (
-                        <a href={asset.scanPhotoUrl} target="_blank" rel="noreferrer" title="開啟照片">
+                        <button
+                          className="photo-thumb-button"
+                          type="button"
+                          onClick={() => setPhotoPreview({ assetNo: asset.assetNo, url: asset.scanPhotoUrl || "" })}
+                          title="查看照片"
+                        >
                           <img src={asset.scanPhotoUrl} alt={`${asset.assetNo} 盤點照片`} />
-                        </a>
+                        </button>
                       ) : (
                         <span>
                           <ImageIcon size={18} />
@@ -704,6 +710,28 @@ function TaskWorkspace({ task, onRefresh }: { task: TaskDetail; onRefresh: () =>
             </>
           )}
         </div>
+
+        {photoPreview && (
+          <div className="modal-backdrop" role="presentation" onClick={() => setPhotoPreview(null)}>
+            <section className="photo-modal" role="dialog" aria-modal="true" aria-labelledby="photo-modal-title" onClick={(event) => event.stopPropagation()}>
+              <header className="modal-header">
+                <h2 id="photo-modal-title">{photoPreview.assetNo} 盤點照片</h2>
+                <button className="icon-button" type="button" onClick={() => setPhotoPreview(null)} title="關閉">
+                  <X size={16} />
+                </button>
+              </header>
+              <img src={photoPreview.url} alt={`${photoPreview.assetNo} 盤點照片`} />
+              <div className="modal-actions">
+                <a className="secondary-button" href={photoPreview.url} target="_blank" rel="noreferrer">
+                  開啟原圖
+                </a>
+                <button className="primary-button" type="button" onClick={() => setPhotoPreview(null)}>
+                  關閉
+                </button>
+              </div>
+            </section>
+          </div>
+        )}
 
         <div className="panel side-panel">
           <div className="scan-share-card">
