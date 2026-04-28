@@ -19,6 +19,8 @@ function decryptAssets(b64) {
 }
 
 const app = express();
+app.set("trust proxy", true);
+
 const PORT = process.env.PORT || 4173;
 const DATA_DIR = path.join(__dirname, "..", "data");
 const SCAN_PHOTO_DIR = path.join(DATA_DIR, "scan-photos");
@@ -88,6 +90,20 @@ function saveScanPhoto(taskId, assetNo, photoDataUrl) {
   const filePath = path.join(SCAN_PHOTO_DIR, filename);
   fs.writeFileSync(filePath, Buffer.from(match[2], "base64"));
   return `/scan-photos/${filename}`;
+}
+
+function getPublicBaseUrl(req) {
+  const configuredBaseUrl = String(process.env.PUBLIC_BASE_URL || "").trim().replace(/\/+$/, "");
+  if (configuredBaseUrl) return configuredBaseUrl;
+  return `${req.protocol}://${req.get("host")}`;
+}
+
+function toAbsoluteUrl(req, value) {
+  if (!value) return "";
+  const text = String(value);
+  if (/^https?:\/\//i.test(text)) return text;
+  const pathname = text.startsWith("/") ? text : `/${text}`;
+  return `${getPublicBaseUrl(req)}${pathname}`;
 }
 
 function parseScanner(scanner) {
@@ -293,7 +309,7 @@ app.get("/api/tasks/:id/export", wrap((req, res) => {
         if (col === "scannerName") return escapeCsv(asset.scannedBy?.name);
         if (col === "scannerEmployeeId") return escapeCsv(asset.scannedBy?.employeeId);
         if (col === "scannerNote") return escapeCsv(asset.scannedBy?.note);
-        if (col === "scanPhotoUrl") return escapeCsv(asset.scanPhotoUrl);
+        if (col === "scanPhotoUrl") return escapeCsv(toAbsoluteUrl(req, asset.scanPhotoUrl));
         return escapeCsv(asset.raw?.[col]);
       }).join(",")
     )
