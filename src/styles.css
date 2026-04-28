@@ -849,6 +849,13 @@ textarea {
   line-height: 1.45;
 }
 
+.scanner-placeholder-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+}
+
 .scan-badge {
   position: absolute;
   left: 12px;
@@ -906,7 +913,7 @@ textarea {
 
 .confirm-actions {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 1fr 1fr 1fr;
   gap: 8px;
 }
 
@@ -949,6 +956,12 @@ textarea {
   margin-top: 16px;
 }
 
+.scan-list-title {
+  color: #263548;
+  font-size: 14px;
+  font-weight: 900;
+}
+
 .scan-row {
   display: flex;
   justify-content: space-between;
@@ -960,6 +973,12 @@ textarea {
   background: #ffffff;
 }
 
+.scan-row div {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
 .scan-row.done {
   border-color: #9ed4bd;
   background: #eef8f4;
@@ -968,6 +987,10 @@ textarea {
 .scan-row span {
   overflow-wrap: anywhere;
   font-weight: 800;
+}
+
+.scan-row small {
+  overflow-wrap: anywhere;
 }
 
 @media (max-width: 980px) {
