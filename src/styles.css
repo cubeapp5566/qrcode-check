@@ -193,6 +193,26 @@ textarea {
   box-shadow: 0 20px 60px rgba(24, 33, 47, 0.28);
 }
 
+.photo-modal {
+  display: grid;
+  gap: 16px;
+  width: min(860px, 100%);
+  max-height: calc(100vh - 48px);
+  padding: 20px;
+  overflow: auto;
+  background: #ffffff;
+  border-radius: 8px;
+  box-shadow: 0 20px 60px rgba(24, 33, 47, 0.28);
+}
+
+.photo-modal img {
+  width: 100%;
+  max-height: min(68vh, 720px);
+  object-fit: contain;
+  border-radius: 8px;
+  background: #101820;
+}
+
 .modal-header,
 .modal-actions {
   display: flex;
@@ -629,6 +649,22 @@ textarea {
   place-items: center;
 }
 
+.photo-thumb-button {
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  padding: 0;
+  border: 1px solid #cbd4df;
+  border-radius: 8px;
+  background: #ffffff;
+  cursor: pointer;
+}
+
+.photo-thumb-button:hover {
+  border-color: #146c5f;
+}
+
 .inventory-photo img,
 .inventory-photo span {
   width: 56px;
@@ -638,7 +674,6 @@ textarea {
 
 .inventory-photo img {
   object-fit: cover;
-  border: 1px solid #cbd4df;
 }
 
 .inventory-photo span {
