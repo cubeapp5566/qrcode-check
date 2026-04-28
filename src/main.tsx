@@ -746,6 +746,7 @@ function ScannerPage({
   onLoadTask: (id: string) => Promise<void>;
 }) {
   const scannerRef = useRef<Html5Qrcode | null>(null);
+  const confirmCardRef = useRef<HTMLDivElement | null>(null);
   const processingRef = useRef(false);
   const lastDecodedRef = useRef<{ value: string; scannedAt: number } | null>(null);
   const initialAssetHandledRef = useRef(false);
@@ -773,7 +774,8 @@ function ScannerPage({
   const [scannerError, setScannerError] = useState("");
   const readerId = "qr-reader";
 
-  const checkedLookup = useMemo(() => new Set(task?.assets.filter((asset) => asset.checkedAt).map((asset) => asset.assetNo)), [task]);
+  const currentScannedAssetNo = pendingScan?.assetNo || lastAssetNo;
+  const currentScannedAsset = currentScannedAssetNo ? task?.assets.find((asset) => asset.assetNo === currentScannedAssetNo) : null;
 
   function saveScannerInfo() {
     const name = scannerDraft.name.trim();
@@ -805,6 +807,24 @@ function ScannerPage({
   function startCamera() {
     setCameraMessage("");
     setCameraEnabled(true);
+  }
+
+  function scrollToPendingScan() {
+    confirmCardRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  function resetPendingScan({ restartCamera = false }: { restartCamera?: boolean } = {}) {
+    setPendingScan(null);
+    setPendingNote("");
+    setLastAssetNo("");
+    setMessage("");
+    setStatus("idle");
+    processingRef.current = false;
+    setScanState("scanning");
+    if (restartCamera) {
+      setCameraMessage("");
+      setCameraEnabled(true);
+    }
   }
 
   function captureScannerPhoto() {
@@ -856,10 +876,11 @@ function ScannerPage({
   }, [onLoadTask, pendingNote, pendingScan, scannerInfo, taskId]);
 
   function cancelPendingScan() {
-    setPendingScan(null);
-    setPendingNote("");
-    processingRef.current = false;
-    setScanState("scanning");
+    resetPendingScan();
+  }
+
+  function restartScan() {
+    resetPendingScan({ restartCamera: true });
   }
 
   const prepareScanConfirmation = useCallback((rawValue: string) => {
@@ -878,9 +899,12 @@ function ScannerPage({
     setLastAssetNo(assetNo);
     setPendingScan({ assetNo, rawValue, photoDataUrl: captureScannerPhoto() });
     setPendingNote("");
+    setCameraMessage("已偵測到 QR Code，相機已暫停。請確認資產，或重新掃描。");
+    setCameraEnabled(false);
     setStatus("idle");
     setMessage("");
     setScanState("confirming");
+    window.setTimeout(scrollToPendingScan, 120);
     return true;
   }, [taskId]);
 
@@ -1018,15 +1042,26 @@ function ScannerPage({
           ) : (
             <div className="scanner-placeholder">
               <QrCode size={36} />
-              <strong>相機尚未啟動</strong>
+              <strong>{pendingScan ? "已偵測到 QR Code" : "相機尚未啟動"}</strong>
               {cameraMessage && <span>{cameraMessage}</span>}
-              <button className="secondary-button" type="button" onClick={startCamera}>
-                啟動相機
-              </button>
+              {pendingScan ? (
+                <div className="scanner-placeholder-actions">
+                  <button className="primary-button" type="button" onClick={scrollToPendingScan}>
+                    請確認此資產
+                  </button>
+                  <button className="secondary-button" type="button" onClick={restartScan}>
+                    重新掃描
+                  </button>
+                </div>
+              ) : (
+                <button className="secondary-button" type="button" onClick={startCamera}>
+                  啟動相機
+                </button>
+              )}
             </div>
           )}
           {pendingScan && (
-            <div className="confirm-scan-card">
+            <div className="confirm-scan-card" ref={confirmCardRef}>
               <div>
                 <span>待確認資產</span>
                 <strong>{pendingScan.assetNo}</strong>
@@ -1048,6 +1083,9 @@ function ScannerPage({
               <div className="confirm-actions">
                 <button className="secondary-button" type="button" onClick={cancelPendingScan}>
                   取消
+                </button>
+                <button className="secondary-button" type="button" onClick={restartScan}>
+                  重新掃描
                 </button>
                 <button className="primary-button" type="button" onClick={confirmScan} disabled={scanState === "processing"}>
                   <CheckCircle2 size={16} />
@@ -1073,14 +1111,26 @@ function ScannerPage({
         </section>
       )}
 
-      {task && (
+      {task && currentScannedAssetNo && (
         <section className="scan-list">
-          {task.assets.map((asset) => (
-            <div className={`scan-row ${checkedLookup.has(asset.assetNo) ? "done" : ""}`} key={asset.assetNo}>
-              <span>{asset.assetNo}</span>
-              <small>{asset.checkedAt ? formatDate(asset.checkedAt) : "待盤點"}</small>
+          <div className="scan-list-title">當前掃描資產</div>
+          {currentScannedAsset ? (
+            <div className={`scan-row ${currentScannedAsset.checkedAt ? "done" : ""}`}>
+              <div>
+                <span>{currentScannedAsset.assetNo}</span>
+                <small>{currentScannedAsset.raw["資產名稱"] || currentScannedAsset.raw.name || currentScannedAsset.raw.Name || ""}</small>
+              </div>
+              <small>{currentScannedAsset.checkedAt ? `已盤點 · ${formatDate(currentScannedAsset.checkedAt)}` : "待確認盤點"}</small>
             </div>
-          ))}
+          ) : (
+            <div className="scan-row">
+              <div>
+                <span>{currentScannedAssetNo}</span>
+                <small>此任務沒有這個資產編號</small>
+              </div>
+              <small>未列入清冊</small>
+            </div>
+          )}
         </section>
       )}
     </main>
