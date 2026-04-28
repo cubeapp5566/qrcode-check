@@ -1,6 +1,9 @@
 services:
   qrcode-check:
-    build: .
+    build:
+      context: .
+      args:
+        VITE_ASSET_CIPHER_KEY: ${VITE_ASSET_CIPHER_KEY}
     image: qrcode-check:latest
     container_name: qrcode-check
     restart: unless-stopped
@@ -9,5 +12,7 @@ services:
     environment:
       NODE_ENV: production
       PORT: 4173
+      ASSET_CIPHER_KEY: ${ASSET_CIPHER_KEY}
+      DELETE_TASK_PASSWORD: ${DELETE_TASK_PASSWORD}
     volumes:
       - ./data:/app/data

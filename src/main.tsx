@@ -74,7 +74,10 @@ type ScannerInfo = {
 
 const SCANNER_STORAGE_KEY = "qrcode-check-scanner";
 
-const ASSET_CIPHER_KEY = "QRCodeCheck!Fixed@Key#2024$Data!"; // 32 bytes, AES-256-GCM
+const ASSET_CIPHER_KEY = import.meta.env.VITE_ASSET_CIPHER_KEY as string;
+if (!ASSET_CIPHER_KEY || new TextEncoder().encode(ASSET_CIPHER_KEY).length !== 32) {
+  throw new Error("VITE_ASSET_CIPHER_KEY 必須為 32 bytes 的 UTF-8 字串");
+}
 
 async function encryptAssets(assets: { assetNo: string; raw: Record<string, string> }[]): Promise<string> {
   const keyBytes = new TextEncoder().encode(ASSET_CIPHER_KEY);

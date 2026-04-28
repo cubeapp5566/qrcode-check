@@ -4,7 +4,16 @@ const path = require("node:path");
 const express = require("express");
 const Database = require("better-sqlite3");
 
-const ASSET_CIPHER_KEY = Buffer.from("QRCodeCheck!Fixed@Key#2024$Data!", "utf8"); // 32 bytes
+const ASSET_CIPHER_KEY_RAW = process.env.ASSET_CIPHER_KEY;
+if (!ASSET_CIPHER_KEY_RAW) {
+  console.error("[FATAL] 缺少環境變數 ASSET_CIPHER_KEY");
+  process.exit(1);
+}
+const ASSET_CIPHER_KEY = Buffer.from(ASSET_CIPHER_KEY_RAW, "utf8");
+if (ASSET_CIPHER_KEY.length !== 32) {
+  console.error(`[FATAL] ASSET_CIPHER_KEY 必須為 32 bytes UTF-8 字串（目前 ${ASSET_CIPHER_KEY.length} bytes）`);
+  process.exit(1);
+}
 
 function decryptAssets(b64) {
   const combined = Buffer.from(b64, "base64");
@@ -22,7 +31,11 @@ const app = express();
 const PORT = process.env.PORT || 4173;
 const DATA_DIR = path.join(__dirname, "..", "data");
 const SCAN_PHOTO_DIR = path.join(DATA_DIR, "scan-photos");
-const DELETE_TASK_PASSWORD = "dmishandsome";
+const DELETE_TASK_PASSWORD = process.env.DELETE_TASK_PASSWORD;
+if (!DELETE_TASK_PASSWORD) {
+  console.error("[FATAL] 缺少環境變數 DELETE_TASK_PASSWORD");
+  process.exit(1);
+}
 
 if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
 if (!fs.existsSync(SCAN_PHOTO_DIR)) fs.mkdirSync(SCAN_PHOTO_DIR, { recursive: true });
