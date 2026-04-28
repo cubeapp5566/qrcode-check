@@ -12,6 +12,7 @@ RUN npm ci
 COPY tsconfig.json vite.config.ts index.html ./
 COPY src ./src
 COPY server ./server
+COPY public ./public
 
 # Vite 在 build 時會把 VITE_* 環境變數編進前端 bundle
 ARG VITE_ASSET_CIPHER_KEY
