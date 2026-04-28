@@ -36,6 +36,7 @@ db.exec(`
     id              TEXT PRIMARY KEY,
     name            TEXT NOT NULL,
     resource_column TEXT NOT NULL,
+    asset_name_column TEXT NOT NULL DEFAULT '',
     location_column TEXT NOT NULL DEFAULT '',
     created_at      TEXT NOT NULL,
     updated_at      TEXT NOT NULL
@@ -51,6 +52,11 @@ db.exec(`
     PRIMARY KEY (task_id, asset_no)
   );
 `);
+
+const taskColumns = db.prepare("PRAGMA table_info(tasks)").all().map((column) => column.name);
+if (!taskColumns.includes("asset_name_column")) {
+  db.prepare("ALTER TABLE tasks ADD COLUMN asset_name_column TEXT NOT NULL DEFAULT ''").run();
+}
 
 app.use(express.json({ limit: "10mb" }));
 app.use("/scan-photos", express.static(SCAN_PHOTO_DIR));
@@ -116,6 +122,7 @@ function toSummary(task, total, checked) {
     id: task.id,
     name: task.name,
     resourceColumn: task.resource_column,
+    assetNameColumn: task.asset_name_column || "",
     locationColumn: task.location_column || "",
     total,
     checked,
@@ -137,7 +144,7 @@ app.get("/api/tasks", wrap((_req, res) => {
 }));
 
 app.post("/api/tasks", wrap((req, res) => {
-  const { name, resourceColumn, locationColumn, encryptedAssets } = req.body;
+  const { name, resourceColumn, assetNameColumn, locationColumn, encryptedAssets } = req.body;
 
   let assets;
   try {
@@ -167,17 +174,18 @@ app.post("/api/tasks", wrap((req, res) => {
   const id = crypto.randomUUID();
   const taskName = String(name).trim();
   const resCol = String(resourceColumn).trim();
+  const assetNameCol = String(assetNameColumn || "").trim();
   const locCol = String(locationColumn || "").trim();
 
   const insertTask = db.prepare(
-    "INSERT INTO tasks (id, name, resource_column, location_column, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)"
+    "INSERT INTO tasks (id, name, resource_column, asset_name_column, location_column, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)"
   );
   const insertAsset = db.prepare(
     "INSERT INTO assets (task_id, asset_no, raw) VALUES (?, ?, ?)"
   );
 
   db.transaction(() => {
-    insertTask.run(id, taskName, resCol, locCol, now, now);
+    insertTask.run(id, taskName, resCol, assetNameCol, locCol, now, now);
     for (const asset of cleanAssets) {
       insertAsset.run(id, asset.assetNo, JSON.stringify(asset.raw));
     }
@@ -193,7 +201,14 @@ app.get("/api/tasks/:id", wrap((req, res) => {
 
   const assets = db.prepare("SELECT * FROM assets WHERE task_id = ? ORDER BY asset_no").all(task.id).map(rowToAsset);
   const checked = assets.filter((a) => a.checkedAt).length;
-  res.json({ ...task, resourceColumn: task.resource_column, locationColumn: task.location_column, assets, summary: toSummary(task, assets.length, checked) });
+  res.json({
+    ...task,
+    resourceColumn: task.resource_column,
+    assetNameColumn: task.asset_name_column || "",
+    locationColumn: task.location_column,
+    assets,
+    summary: toSummary(task, assets.length, checked)
+  });
 }));
 
 app.delete("/api/tasks/:id", wrap((req, res) => {
@@ -258,7 +273,7 @@ app.get("/api/tasks/:id/export", wrap((req, res) => {
     }, new Set())
   );
   const columns = [
-    "assetNo", "status", "checkedAt", "location",
+    "assetNo", "assetName", "status", "checkedAt", "location",
     "scannerName", "scannerEmployeeId", "scannerNote", "scanPhotoUrl",
     ...rawColumns.filter((col) => col !== "assetNo")
   ];
@@ -271,6 +286,7 @@ app.get("/api/tasks/:id/export", wrap((req, res) => {
     ...assets.map((asset) =>
       columns.map((col) => {
         if (col === "assetNo") return escapeCsv(asset.assetNo);
+        if (col === "assetName") return escapeCsv(asset.raw?.[task.asset_name_column]);
         if (col === "status") return escapeCsv(asset.checkedAt ? "checked" : "missing");
         if (col === "checkedAt") return escapeCsv(asset.checkedAt);
         if (col === "location") return escapeCsv(asset.raw?.[task.location_column]);
